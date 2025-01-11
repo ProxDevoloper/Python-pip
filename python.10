@@ -1,0 +1,63 @@
+import sqlite3
+from datetime import datetime
+import requests
+from bs4 import BeautifulSoup
+
+
+# Функция для инициализации базы данных
+def init_db():
+    conn = sqlite3.connect("weather.db")
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS weather (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            datetime TEXT NOT NULL,
+            temperature TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+# Функция для добавления записи в базу данных
+def add_weather_to_db(datetime_now, temperature):
+    conn = sqlite3.connect("weather.db")
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO weather (datetime, temperature) VALUES (?, ?)",
+        (datetime_now, temperature)
+    )
+    conn.commit()
+    conn.close()
+
+
+# Функция для парсинга температуры
+def get_weather():
+    # Укажите URL сайта с погодой для вашего города
+    url = "https://www.example.com/weather-in-your-city"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    # Найдите элемент, содержащий температуру
+    # Замените 'temperature_selector' на реальный CSS-селектор сайта
+    temperature_element = soup.select_one(".temperature_selector")
+    if temperature_element:
+        return temperature_element.text.strip()
+    else:
+        return "Не удалось извлечь температуру"
+
+
+# Основной блок выполнения
+if __name__ == "__main__":
+    init_db()  # Инициализация базы данных
+
+    # Получаем текущую дату и время
+    current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Получаем температуру
+    temperature = get_weather()
+    if temperature != "Не удалось извлечь температуру":
+        add_weather_to_db(current_datetime, temperature)
+        print(f"Температура '{temperature}' добавлена в БД.")
+    else:
+        print("Ошибка: Не удалось получить данные о температуре.")
