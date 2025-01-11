@@ -1,0 +1,268 @@
+import flet as ft
+import sqlite3
+from datetime import datetime
+import os
+
+
+
+def init_db():
+  
+    if not os.path.exists("notes.db"):
+        conn = sqlite3.connect("notes.db")
+        cursor = conn.cursor()
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            summary TEXT NOT NULL
+        )
+        """)
+        conn.commit()
+        conn.close()
+
+
+
+def add_note_to_db(title, content, created_at, summary):
+    conn = sqlite3.connect("notes.db")
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO notes (title, content, created_at, summary) VALUES (?, ?, ?, ?)",
+        (title, content, created_at, summary)
+    )
+    conn.commit()
+    conn.close()
+
+
+# Функция получения всех заметок
+def get_notes_from_db():
+    conn = sqlite3.connect("notes.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, title, content, created_at, summary FROM notes")
+    notes = cursor.fetchall()
+    conn.close()
+    return notes
+
+
+# Функция удаления заметки
+def delete_note_from_db(note_id):
+    conn = sqlite3.connect("notes.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM notes WHERE id = ?", (note_id,))
+    conn.commit()
+    conn.close()
+
+
+# Главная функция приложения
+def main(page: ft.Page):
+    page.title = "Блокнот"
+    page.theme_mode = "Light"
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    page.vertical_alignment = ft.MainAxisAlignment.CENTER
+    page.theme =  ft.Theme(
+         color_scheme=ft.ColorScheme(
+            primary=ft.colors.BLACK, 
+            primary_container=ft.colors.BLACK,  
+            
+        ),
+      
+    )
+   
+
+    
+    # Диалог для просмотра заметки
+    dialog = ft.AlertDialog()
+
+    def open_note_dialog(note_title, note_content):
+        dialog.title = ft.Text(note_title, size=24, weight="bold", color="black")
+        dialog.content = ft.Text(note_content, size=18, color="black")
+        page.dialog = dialog
+        dialog.open = True
+        page.update()
+
+    def update_notes_list():
+        notes = get_notes_from_db()
+        notes_list.controls.clear()
+        for idx, (note_id, note_title, note_content, created_at, summary) in enumerate(notes, start=1):
+            notes_list.controls.append(
+                ft.Container(
+                    content=ft.Row(
+                        [
+                            ft.Column(
+                                [
+                                    ft.Text(f"{idx}. {note_title}", weight="bold", size=20, color="black"),
+                                    ft.Text(f"Дата: {created_at}", size=14, italic=True, color="black"),
+                                    ft.Text(f"Комментарий: {summary}", size=14, color="black"),
+                                ],
+                                expand=1,
+                            ),
+                            ft.IconButton(
+                                icon=ft.icons.REMOVE_RED_EYE,
+                                tooltip="Посмотреть заметку",
+                                on_click=lambda e, title=note_title, content=note_content: open_note_dialog(title, content),
+                            ),
+                            ft.IconButton(
+                                icon=ft.icons.DELETE,
+                                tooltip="Удалить заметку",
+                                on_click=lambda e, nid=note_id: delete_note_and_update(nid),
+                            ),
+                        ],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    ),
+                    padding=10,
+                    border=ft.Border(
+                        left=ft.BorderSide(2, ft.colors.BLACK),  # Рамки черного цвета
+                        right=ft.BorderSide(2, ft.colors.BLACK),
+                        top=ft.BorderSide(2, ft.colors.BLACK),
+                        bottom=ft.BorderSide(2, ft.colors.BLACK),
+                    ),
+                    margin=10,
+                )
+            )
+        
+        # Обновляем заголовок, показывающий количество заметок
+        notes_count_text.value = f"Общее количество заметок: {len(notes)}"
+        page.update()
+
+    def delete_note_and_update(note_id):
+        delete_note_from_db(note_id)
+        update_notes_list()
+
+    def create_new_note(e):
+        if new_note_title_input.value.strip() and new_note_content_input.value.strip():
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            add_note_to_db(
+                new_note_title_input.value.strip(),
+                new_note_content_input.value.strip(),
+                current_time,
+                new_note_summary_input.value.strip(),
+            )
+            new_note_title_input.value = ""
+            new_note_content_input.value = ""
+            new_note_summary_input.value = ""
+            page.snack_bar = ft.SnackBar(ft.Text("Заметка добавлена!", color="black"))
+            page.snack_bar.open()
+            update_notes_list()
+            page.update()
+
+    def theme_toggle(e):
+        page.theme_mode = "Light" if page.theme_mode == "Dark" else "Dark"
+        page.update()
+
+    def show_home(e):
+        page.clean()
+        page.add(home_page)
+        page.update()
+
+    def show_new_note_page(e):
+        page.clean()
+        page.add(new_note_page)
+        page.update()
+
+    def show_notes_page(e):
+        update_notes_list()
+        page.clean()
+        page.add(notes_page)
+        page.update()
+
+    def review(e):
+        page.clean()
+        page.add(rreview)
+        page.update()
+
+
+    def pos(e):
+        page.clean()
+        page.add(poshalka)
+        page.update()
+
+    # Поля для ввода новой заметки
+    new_note_title_input = ft.TextField(label="Название заметки", color="black")
+    new_note_content_input = ft.TextField(label="Текст заметки", multiline=True, height=150, color="black")
+    new_note_summary_input = ft.TextField(label="Комментарий", multiline=True, height=100, color="black")
+
+    poshalka = ft.Row(
+        [
+            ft.Column(
+                [
+                    ft.Text("Здраствуйте!Ответьте на вопрос,кто создал компьютер?",size = 30),
+                    ft.IconButton(ft.icons.HOME,on_click=review)
+                ]
+            )
+        ],
+        alignment=ft.MainAxisAlignment.CENTER,
+    )
+
+
+    # Страница для корзины
+    rreview = ft.Row(
+        [
+            ft.Column(
+                [
+                    ft.Text("Дайте алмазик", color="black", size=30),
+                    ft.ElevatedButton("Посхалка2",on_click =pos),
+            
+                    ft.IconButton(ft.icons.HOME, on_click=show_home),
+                ]
+            ),
+        ],
+        alignment=ft.MainAxisAlignment.CENTER,
+    )
+
+    # Домашняя страница
+    home_page = ft.Row(
+        [
+            ft.Column(
+                [
+                    ft.ElevatedButton("Новая заметка", width=400, on_click=show_new_note_page),
+                    ft.ElevatedButton("Мои заметки", width=400, on_click=show_notes_page),
+                    ft.ElevatedButton("Посхалка", width=400, color="black", on_click=review),
+                ]
+            ),
+            ft.IconButton(ft.icons.SUNNY, on_click=theme_toggle),
+        ],
+        alignment=ft.MainAxisAlignment.CENTER,
+    )
+
+    # Страница создания новой заметки
+    new_note_page = ft.Column(
+        [
+            ft.Text("Создать новую заметку", color="black", size=30),
+            new_note_title_input,
+            new_note_content_input,
+            new_note_summary_input,
+            ft.ElevatedButton("Сохранить", on_click=create_new_note),
+            ft.IconButton(ft.icons.HOME, on_click=show_home),
+        ],
+        alignment=ft.MainAxisAlignment.CENTER,
+    )
+
+    # Прокручиваемый список заметок
+    notes_list = ft.ListView(
+        expand=True,
+        spacing=10,
+        padding=10,
+    )
+
+    # Заголовок с количеством заметок
+    notes_count_text = ft.Text("Общее количество заметок: 0", size=20, weight="bold", color="black")
+
+    # Страница со списком заметок
+    notes_page = ft.Column(
+        [
+            notes_count_text,
+            notes_list,
+            ft.IconButton(ft.icons.HOME, on_click=show_home),
+        ],
+        alignment=ft.MainAxisAlignment.START,
+        expand=True,
+    )
+
+    # Запуск с домашней страницы
+    page.add(home_page)
+
+
+if __name__ == "__main__":
+    init_db()
+    ft.app(target=main)
